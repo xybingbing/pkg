@@ -1,4 +1,4 @@
-package gorm
+package db
 
 import (
 	"context"
@@ -37,9 +37,9 @@ func debugInterceptor(callbackName string, config *Config) func(Handler) Handler
 			next(db)
 			cost := time.Since(beg)
 			if db.Error != nil {
-				log.Println("[db.response]", cost, logSQL(db), db.Error.Error())
+				log.Println("[", cost, "]", "\x1b[32m", logSQL(db), "\x1b[0m", "err:", "\x1b[31m", db.Error.Error(), "\x1b[0m")
 			} else {
-				log.Println("[db.response]", cost, logSQL(db))
+				log.Println("[", cost, "]", "\x1b[32m", logSQL(db), "\x1b[0m")
 			}
 		}
 	}

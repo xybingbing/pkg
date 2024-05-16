@@ -1,8 +1,9 @@
-package gorm
+package db
 
 import (
 	"context"
 	"errors"
+	"github.com/xybingbing/pkg/log"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -17,14 +18,24 @@ const (
 	TypePostgreSQL = "postgres"
 )
 
+/*
+CREATE TABLE `example` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '自增id',
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+  `updated_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB COMMENT='表备注';
+*/
+
 type Config struct {
+	Logger           *log.Logger
 	Type             string `default:"mysql"`
 	DSN              string `default:"-"`
 	MaxIdleConn      int    `default:"10"`    // 最大空闲连接数，默认10
 	MaxOpenConn      int    `default:"100"`   // 最大活动连接数，默认100
 	ConnMaxLifetime  int    `default:"300"`   // 连接的最大存活时间，默认300s
 	ConnMaxIdleTime  int    `default:"300"`   // 连接的最大空闲时间，默认300s
-	SlowLogThreshold int    `default:"1000"`  // 慢日志阈值，默认500ms
+	SlowLogThreshold int    `default:"1000"`  // 慢日志阈值，默认1000ms
 	EnableDebug      bool   `default:"false"` // 是否开启调试
 	EnableMetric     bool   `default:"false"` // 是否开启监控
 	EnableTrace      bool   `default:"true"`  // 是否开启链路追踪，默认开启
@@ -38,8 +49,12 @@ type Wrapper struct {
 	db *gorm.DB
 }
 
-func (wrap *Wrapper) GetSession(ctx context.Context) *gorm.DB {
-	return wrap.db.Session(&gorm.Session{NewDB: true, Context: ctx})
+func (wrap *Wrapper) GetDB() *gorm.DB {
+	return wrap.db
+}
+
+func GetSession(ctx context.Context, db *gorm.DB) *gorm.DB {
+	return db.Session(&gorm.Session{NewDB: true, Context: ctx})
 }
 
 func NewWrapper(config *Config, obj ...string) (*Wrapper, error) {
@@ -67,23 +82,33 @@ func newDB(config *Config) (*gorm.DB, error) {
 		gormDB *gorm.DB
 		err    error
 	)
+
+	logger := NewZapLog(config.Logger.Logger)
+
 	switch config.Type {
 	case TypeSQLite:
-		gormDB, err = gorm.Open(sqlite.Open(config.DSN), &gorm.Config{})
+		gormDB, err = gorm.Open(sqlite.Open(config.DSN), &gorm.Config{
+			Logger: logger,
+		})
 		if err != nil {
 			return nil, err
 		}
 	case TypeMySQL:
-		gormDB, err = gorm.Open(mysql.Open(config.DSN), &gorm.Config{})
+		gormDB, err = gorm.Open(mysql.Open(config.DSN), &gorm.Config{
+			Logger: logger,
+		})
 		if err != nil {
 			return nil, err
 		}
 	case TypePostgreSQL:
-		gormDB, err = gorm.Open(postgres.Open(config.DSN), &gorm.Config{})
+		gormDB, err = gorm.Open(postgres.Open(config.DSN), &gorm.Config{
+			Logger: logger,
+		})
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	if gormDB == nil {
 		return nil, errors.New("gormDB is nil")
 	}
@@ -146,4 +171,39 @@ func newDB(config *Config) (*gorm.DB, error) {
 		return nil, err
 	}
 	return gormDB, nil
+}
+
+//================================================================================
+
+type Page struct {
+	Page     int32  `json:"page"`
+	PageSize int32  `json:"page_size"`
+	OrderBy  string `json:"order_by"`
+}
+
+func PageOption(session *gorm.DB, pg *Page) *gorm.DB {
+	if pg == nil {
+		return session
+	}
+	if pg.Page == 0 {
+		pg.Page = 1
+	}
+	if pg.PageSize == 0 {
+		pg.PageSize = 100
+	}
+	offset := (pg.Page - 1) * pg.PageSize
+	session = session.Offset(int(offset)).Limit(int(pg.PageSize))
+	if pg.OrderBy != "" {
+		session = session.Order(pg.OrderBy)
+	}
+	return session
+}
+
+type Filters map[string]interface{}
+
+func (list Filters) Execute(db *gorm.DB) *gorm.DB {
+	for key, val := range list {
+		db = db.Where(key, val)
+	}
+	return db
 }
