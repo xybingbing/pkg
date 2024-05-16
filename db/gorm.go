@@ -176,8 +176,8 @@ func newDB(config *Config) (*gorm.DB, error) {
 //================================================================================
 
 type Page struct {
-	Page     int32  `json:"page"`
-	PageSize int32  `json:"page_size"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"page_size"`
 	OrderBy  string `json:"order_by"`
 }
 

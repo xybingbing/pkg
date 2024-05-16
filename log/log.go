@@ -9,12 +9,12 @@ import (
 )
 
 type Config struct {
-	LogFileName string `default:"-"`    // 日志文件路径
-	LogLevel    string `default:"info"` // 日志级别
-	MaxSize     int    `default:"100"`  // 每个日志文件的最大单位：M
-	MaxBackups  int    `default:"1"`    // 可以为日志文件保存的最大备份数
-	MaxAge      int    `default:"5"`    // 文件可以保存的最大天数
-	Compress    bool   `default:"true"` // 是否压缩
+	LogFileName string `default:"./log.log"` // 日志文件路径
+	LogLevel    string `default:"info"`      // 日志级别
+	MaxSize     int    `default:"100"`       // 每个日志文件的最大单位：M
+	MaxBackups  int    `default:"1"`         // 可以为日志文件保存的最大备份数
+	MaxAge      int    `default:"5"`         // 文件可以保存的最大天数
+	Compress    bool   `default:"true"`      // 是否压缩
 	Encoding    string `default:"console"`
 }
 
@@ -22,7 +22,10 @@ type Logger struct {
 	*zap.Logger
 }
 
-func NewLog(cfg *Config) *Logger {
+type Option func(log *Logger)
+
+func NewLog(cfg *Config, opts ...Option) *Logger {
+
 	var level zapcore.Level //debug<info<warn<error<fatal<panic
 	switch cfg.LogLevel {
 	case "debug":
@@ -87,7 +90,6 @@ func NewLog(cfg *Config) *Logger {
 	}
 	if val != "prod" {
 		return &Logger{zap.New(core, zap.Development(), zap.AddCaller(), zap.AddStacktrace(zap.ErrorLevel))}
-
 	}
 	return &Logger{zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.ErrorLevel))}
 }
