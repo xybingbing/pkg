@@ -127,6 +127,8 @@ func setField(field reflect.Value, defaultVal string) error {
 			}
 		case reflect.String:
 			field.Set(reflect.ValueOf(defaultVal).Convert(field.Type()))
+		default:
+			println(defaultVal, field.Type().String())
 		}
 	}
 	return nil
@@ -144,6 +146,8 @@ func initializeField(field reflect.Value, tag string) bool {
 		if !field.IsNil() && field.Elem().Kind() == reflect.Struct {
 			return true
 		}
+	default:
+		return false
 	}
 	return tag != ""
 }
